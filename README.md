@@ -1,5 +1,6 @@
 # 🧰 docs-toolbox
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
 
 A lightweight Docker image for running **Docs-as-Code pipelines** in a
@@ -116,4 +117,4 @@ A real-world example of a Docs-as-Code pipeline for personal branding.
 
 ## 📄 License
 
-This project is licensed under the [MIT](./LICENSE) License.
+This project is licensed under the [MIT](./LICENSE.md) License.
