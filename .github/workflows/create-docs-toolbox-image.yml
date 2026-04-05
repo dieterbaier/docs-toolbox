@@ -55,6 +55,48 @@ jobs:
 
           echo "Using tags: ${TAGS}"
 
+      - name: Extract description from README marker block
+        id: readme
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FALLBACK="A lightweight Docker image for running Docs-as-Code pipelines in a fully reproducible environment — locally and in CI."
+
+          if [[ ! -f README.md ]]; then
+            echo "description=${FALLBACK}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DESC="$(
+            awk '
+              /<!-- image-description:start -->/ { capture=1; next }
+              /<!-- image-description:end -->/   { capture=0; exit }
+              capture { print }
+            ' README.md
+          )"
+
+          # Falls Marker fehlen oder leer sind -> Fallback
+          if [[ -z "${DESC//[[:space:]]/}" ]]; then
+            DESC="$FALLBACK"
+          fi
+
+          # Auf eine Zeile reduzieren
+          DESC="$(printf '%s' "$DESC" | tr '\n' ' ')"
+          DESC="$(printf '%s' "$DESC" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
+
+          # Ein bisschen Markdown entschärfen
+          DESC="$(printf '%s' "$DESC" | sed -E 's/\[([^\]]+)\]\([^)]+\)/\1/g')"
+          DESC="$(printf '%s' "$DESC" | sed -E 's/`([^`]+)`/\1/g')"
+
+          # Für GITHUB_OUTPUT / Shell sicherer machen
+          DESC="$(printf '%s' "$DESC" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+
+          # GHCR description max. 512 Zeichen
+          DESC="$(printf '%.512s' "$DESC")"
+
+          echo "description=${DESC}" >> "$GITHUB_OUTPUT"
+          echo "Description: ${DESC}"
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
@@ -71,6 +113,7 @@ jobs:
 
           IMAGE="${{ steps.image.outputs.image_name }}"
           TAGS="${{ steps.meta.outputs.tags }}"
+          DESCRIPTION="${{ steps.readme.outputs.description }}"
 
           TAG_ARGS=""
           IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
@@ -83,12 +126,15 @@ jobs:
             --cache-from=type=registry,ref=$IMAGE:cache \
             --cache-to=type=registry,ref=$IMAGE:cache,mode=max \
             $TAG_ARGS \
+            --annotation "index:org.opencontainers.image.description=$DESCRIPTION" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
             --push .
 
       - name: Print summary
         shell: bash
         run: |
           echo "Dockerfile hash tag: ${{ steps.meta.outputs.hash_tag }}"
+          echo "Description: ${{ steps.readme.outputs.description }}"
           if [[ "${{ steps.meta.outputs.has_git_tag }}" == "true" ]]; then
             echo "Git tag: ${{ steps.meta.outputs.git_tag }}"
             echo "latest tag was also published"

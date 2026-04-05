@@ -3,8 +3,9 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
 
-A lightweight Docker image for running **Docs-as-Code pipelines** in a
-**fully reproducible environment** — locally and in CI.
+<!-- image-description:start -->
+A lightweight Docker image for running Docs-as-Code pipelines in a fully reproducible environment — locally and in CI.
+<!-- image-description:end -->
 
 Stop installing random tools locally.  
 Stop breaking your CI builds.  
