@@ -98,8 +98,9 @@ This image follows a few simple principles:
 - 🧼 No hidden magic
 
 ## 🔄 Versioning
-- latest → most recent stable toolchain
+- latest → most recent stable toolbox
 - version tags → reproducible builds
+- `df-<hash>` → image of latest commit (does not need to be the same as 'latest')
 
 👉 Pin versions in CI for full determinism.
 

@@ -1,24 +1,59 @@
-name: Build Docs
+name: Build Docs Toolbox Image
 
 on:
   push:
     branches: [ main ]
+    tags:
+      - '*'
   workflow_dispatch:
 
 jobs:
   build-image:
     runs-on: ubuntu-latest
-    outputs:
-      image_name: ${{ steps.setImageName.outputs.IMAGE_NAME }}
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set image name
-        id: setImageName
+        id: image
+        shell: bash
         run: |
           IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER}/docs-toolbox"
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "image_name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute tags
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE="${{ steps.image.outputs.image_name }}"
+
+          DOCKERFILE_HASH="$(sha256sum Dockerfile | awk '{print $1}' | cut -c1-12)"
+          HASH_TAG="df-${DOCKERFILE_HASH}"
+
+          TAGS="${IMAGE}:${HASH_TAG}"
+          HAS_GIT_TAG=false
+          GIT_TAG=""
+
+          if git tag --points-at HEAD | grep -q .; then
+            GIT_TAG="$(git tag --points-at HEAD | head -n1)"
+            HAS_GIT_TAG=true
+            TAGS="${TAGS},${IMAGE}:${GIT_TAG},${IMAGE}:latest"
+          fi
+
+          echo "dockerfile_hash=${DOCKERFILE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "hash_tag=${HASH_TAG}" >> "$GITHUB_OUTPUT"
+          echo "has_git_tag=${HAS_GIT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "git_tag=${GIT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+          echo "Using tags: ${TAGS}"
 
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -29,12 +64,34 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image
+      - name: Build and push image
+        shell: bash
         run: |
-          IMAGE=${{ steps.setImageName.outputs.IMAGE_NAME }}
+          set -euo pipefail
+
+          IMAGE="${{ steps.image.outputs.image_name }}"
+          TAGS="${{ steps.meta.outputs.tags }}"
+
+          TAG_ARGS=""
+          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            TAG_ARGS="$TAG_ARGS -t $tag"
+          done
+
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --cache-from=type=registry,ref=$IMAGE:cache \
             --cache-to=type=registry,ref=$IMAGE:cache,mode=max \
-            -t $IMAGE:latest \
+            $TAG_ARGS \
             --push .
+
+      - name: Print summary
+        shell: bash
+        run: |
+          echo "Dockerfile hash tag: ${{ steps.meta.outputs.hash_tag }}"
+          if [[ "${{ steps.meta.outputs.has_git_tag }}" == "true" ]]; then
+            echo "Git tag: ${{ steps.meta.outputs.git_tag }}"
+            echo "latest tag was also published"
+          else
+            echo "No Git tag on HEAD, so no latest tag published"
+          fi
