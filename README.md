@@ -32,7 +32,6 @@ This image provides a ready-to-use toolchain for **Docs-as-Code pipelines**:
 - Asciidoctor
 - Pandoc
 - Graphviz
-- Fonts & PDF tooling
 - Common CLI utilities
 
 👉 Everything preconfigured to work together.
@@ -56,26 +55,26 @@ This image solves that by providing:
 
 ## 🚀 Usage
 
-### Run a build
+### Run a command
 
 ```bash
 docker run --rm \
   -v $(pwd):/workspace \
   -w /workspace \
   ghcr.io/docs-as-code-toolkit/docs-toolbox:latest \
-  ./gradlew build
+  ./asciidoctor -v
 ```
 
 > 💡 On Windows, replace `$(pwd)` with the appropriate path syntax.
 
-### Use in scripts
+### Use in scripts (example)
 
 ```bash
-./build.sh buildSite
+./build.sh <some action>
 ```
 (assuming your project wraps the container execution)
 
-### GitHub Actions
+### GitHub Actions (example
 
 ```yaml
 jobs:
